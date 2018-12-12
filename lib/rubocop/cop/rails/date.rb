@@ -15,7 +15,7 @@ module RuboCop
       # Two styles are supported for this cop. When EnforcedStyle is 'strict'
       # then the Date methods `today`, `current`, `yesterday`, and `tomorrow`
       # are prohibited and the usage of both `to_time`
-      # and 'to_time_in_current_zone' are reported as warning.
+      # and 'in_time_zone' are reported as warning.
       #
       # When EnforcedStyle is 'flexible' then only `Date.today` is prohibited
       # and only `to_time` is reported as warning.
@@ -26,7 +26,7 @@ module RuboCop
       #   Date.yesterday
       #   Date.today
       #   date.to_time
-      #   date.to_time_in_current_zone
+      #   date.in_time_zone
       #
       #   # good
       #   Time.zone.today
@@ -42,7 +42,18 @@ module RuboCop
       #   Time.zone.today - 1.day
       #   Date.current
       #   Date.yesterday
-      #   date.to_time_in_current_zone
+      #   date.in_time_zone
+      #
+      # `to_time_in_current_zone` is a deprecated method.
+      # This cop identifies places where `to_time_in_current_zone`
+      # can be replaced by `in_time_zone`.
+      #
+      # @example
+      #   # bad
+      #    "2016-07-12 14:36:31".to_time_in_current_zone
+      #
+      #   # good
+      #    "2016-07-12 14:36:31".in_time_zone
       #
       class Date < Cop
         include ConfigurableEnforcedStyle
@@ -55,6 +66,9 @@ module RuboCop
 
         BAD_DAYS = %i[today current yesterday tomorrow].freeze
 
+        DEPRECATED_MSG = '`%<deprecated_method>s` is deprecated. ' \
+                         'Use `%<relevant_method>s` instead.'.freeze
+
         def on_const(node)
           mod, klass = *node.children
           # we should only check core Date class (`Date` or `::Date`)
@@ -64,6 +78,11 @@ module RuboCop
         end
 
         def on_send(node)
+          if node.method_name == :to_time_in_current_zone
+            add_offense(node, location: :selector,
+                              message: format(DEPRECATED_MSG, deprecated_method: 'to_time_in_current_zone', relevant_method: 'in_time_zone'))
+          end
+
           return unless node.receiver && bad_methods.include?(node.method_name)
 
           return if safe_chain?(node) || safe_to_time?(node)
@@ -124,7 +143,7 @@ module RuboCop
         end
 
         def bad_methods
-          style == :strict ? %i[to_time to_time_in_current_zone] : [:to_time]
+          style == :strict ? %i[to_time in_time_zone] : [:to_time]
         end
 
         def good_methods
