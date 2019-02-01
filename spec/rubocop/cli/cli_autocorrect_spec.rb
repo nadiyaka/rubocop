@@ -9,6 +9,51 @@ RSpec.describe RuboCop::CLI, :isolated_environment do
     RuboCop::ConfigLoader.default_configuration = nil
   end
 
+  context 'Layout/ExtraSpacing together with Layout/SpaceBeforeBraces' do
+    let(:config) do
+      {
+        'Layout/ExtraSpacing' => {
+          'AllowForAlignment' => true
+        },
+        'Layout/SpaceBeforeBlockBraces' => {
+          'EnforcedStyle' => 'space'
+        }
+      }
+    end
+
+    let(:source) do
+      <<-RUBY.strip_indent
+        ActiveSupport::Notifications.publish BeforeLoadEvent, self # before_load hook
+        files.each{ |file| load file }                             # load files
+        namespace(default_namespace)                               # init AA resources
+        ActiveSupport::Notifications.publish AfterLoadEvent, self  # after_load hook
+      RUBY
+    end
+
+    let(:corrected_source) do
+      <<-RUBY.strip_indent
+        ActiveSupport::Notifications.publish BeforeLoadEvent, self # before_load hook
+        files.each { |file| load file }                             # load files
+        namespace(default_namespace)                               # init AA resources
+        ActiveSupport::Notifications.publish AfterLoadEvent, self  # after_load hook
+      RUBY
+    end
+
+    before do
+      create_file('example.rb', source)
+      create_file('.rubocop.yml', YAML.dump(config))
+    end
+
+    fit 'works correctly' do
+      cli.run(['--auto-correct'])
+
+      expect(IO.read('example.rb'))
+        .to eq(corrected_source)
+
+      expect($stderr.string).to eq('')
+    end
+  end
+
   it 'does not correct ExtraSpacing in a hash that would be changed back' do
     create_file('.rubocop.yml', <<-YAML.strip_indent)
       Layout/AlignHash:
